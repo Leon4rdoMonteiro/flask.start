@@ -1,4 +1,9 @@
 from uuid import uuid4
+from json import loads
+
+from config import db
+
+from models.User import User
 
 class UserService(object):
 
@@ -8,11 +13,7 @@ class UserService(object):
 
     def create(self, body):
 
-        found = list(
-            filter(
-                lambda user: user['email'] == body['email'], self.__users_data
-            )
-        )
+        found = User.query.filter_by(email=body['email']).first()
 
         if found:
             return { 
@@ -21,12 +22,18 @@ class UserService(object):
                 'message': 'User already exists' 
             }
 
-        body['id'] = str(uuid4())
-        self.__users_data.append(body)
+        name, email, password = body.values()
+
+        created = User(name, email, password)
+        db.session.add(created)
+        db.session.commit()
+
+        user = loads(str(created))
 
         response = {
             'error': False,
             'status_code': 201,
+            'data': user,
             'message': 'User created successfully'
         }
 
@@ -35,18 +42,7 @@ class UserService(object):
 
     def show(self, user_id):
 
-        if not self.__users_data:
-            return { 
-                'error': True,
-                'status_code': 404, 
-                'message': 'No data found'
-            }
-
-        found = list(
-            filter(
-                lambda user: user['id'] == user_id, self.__users_data
-            )
-        )
+        found = User.query.filter_by(id=user_id).first()
 
         if not found:
             return { 
@@ -55,7 +51,7 @@ class UserService(object):
                 'message': 'User not found' 
             }
 
-        [user] = found
+        user = loads(str(found))
 
         return {
             'error': False,
@@ -65,37 +61,22 @@ class UserService(object):
 
     
     def index(self):
-        # Get query strings
-        # query = request.args
-        if not self.__users_data:
-            return { 
-                'error': True,
-                'status_code': 404, 
-                'message': 'No data found'
-            }
+        found = User.query.all()
 
-        users = {
+        users = []
+
+        for user in found:
+            users.append(loads(str(user)))
+
+        return { 
             'error': False,
             'status_code': 200,
-            'data': self.__users_data
+            'data': users
         }
-
-        return users
         
     def update(self, user_id, body):
 
-        if not self.__users_data:
-            return { 
-                'error': True,
-                'status_code': 404, 
-                'message': 'No data found'
-            }
-
-        found = list(
-            filter(
-                lambda user: user['id'] == user_id, self.__users_data
-            )
-        )
+        found = User.query.filter_by(id=user_id).first()
 
         if not found:
             return { 
@@ -104,19 +85,27 @@ class UserService(object):
                 'message': 'User not found' 
             }
 
+        try:
+            if found.email == body['email']:
+                return { 
+                    'error': True,
+                    'status_code': 400,
+                    'message': 'User already exists' 
+                }
+        except:
+            pass
 
-        [user] = found
-
-        if user['email'] == body['email']:
-            return { 
-                'error': True,
-                'status_code': 400,
-                'message': 'User already exists' 
-            }
-
+        user = loads(str(found))
 
         user.update(body)
 
+        found.name = user['name']
+        found.email = user['email']
+        found.password = user['password']
+
+        db.session.add(found)
+        db.session.commit()
+        
         return {
             'error': False,
             'status_code': 200,
@@ -127,18 +116,7 @@ class UserService(object):
 
     def delete(self, user_id):
 
-        if not self.__users_data:
-            return { 
-                'error': True,
-                'status_code': 404,
-                'message': 'No data was found' 
-            }
-        
-        found = list(
-            filter(
-                lambda user: user['id'] == user_id, self.__users_data
-            )
-        )
+        found = User.query.filter_by(id=user_id).first()
 
         if not found:
             return { 
@@ -147,10 +125,9 @@ class UserService(object):
                 'message': 'User not found' 
             }
             
-        [user] = found
+        db.session.delete(found)
+        db.session.commit()
 
-        self.__users_data.remove(user)
-        
         return {
             'error': False,
             'status_code': 200,

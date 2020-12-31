@@ -1,8 +1,10 @@
-from config import app
+from config import app, db
 
 from apps.index import apps
 from users.controller import users
 from errors.index import not_found
+
+db.create_all()
 
 # Error handlers register
 app.register_error_handler(404, not_found)
